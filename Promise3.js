@@ -1,5 +1,7 @@
+// 文章链接：https://zhuanlan.zhihu.com/p/21834559
+// 源库地址： https://github.com/xieranmaya/blog/issues/3
 var Promise = (function() {
-  function Promise(resolver) {
+  function Promise(resolver) { // Promise 主体逻辑实现
     if (typeof resolver !== 'function') {
       throw new TypeError('Promise resolver ' + resolver + ' is not a function')
     }
@@ -7,38 +9,38 @@ var Promise = (function() {
 
     var self = this
     self.callbacks = []
-    self.status = 'pending'
+    self.status = 'pending'   // promise初始状态 pending
 
     function resolve(value) {
-      setTimeout(function() {
-        if (self.status !== 'pending') {
+      setTimeout(function() {  // 推入宏任务队列
+        if (self.status !== 'pending') {  // pending -> resolved/fulfilled
           return
         }
         self.status = 'resolved'
         self.data = value
 
-        for (var i = 0; i < self.callbacks.length; i++) {
+        for (var i = 0; i < self.callbacks.length; i++) { // 批量触发then函数里面设置的resolved回调函数
           self.callbacks[i].onResolved(value)
         }
       })
     }
 
     function reject(reason) {
-      setTimeout(function(){
-        if (self.status !== 'pending') {
+      setTimeout(function(){ // 推入宏任务队列
+        if (self.status !== 'pending') {  // pending -> rejected
           return
         }
         self.status = 'rejected'
         self.data = reason
 
-        for (var i = 0; i < self.callbacks.length; i++) {
+        for (var i = 0; i < self.callbacks.length; i++) {  // 批量触发then函数里面设置的rejected回调函数
           self.callbacks[i].onRejected(reason)
         }
       })
     }
 
     try{
-      resolver(resolve, reject)
+      resolver(resolve, reject) // 执行实例化Promise对象时，传入的回调函数，同步执行。
     } catch(e) {
       reject(e)
     }
@@ -79,25 +81,28 @@ var Promise = (function() {
   }
 
   Promise.prototype.then = function(onResolved, onRejected) {
+
     onResolved = typeof onResolved === 'function' ? onResolved : function(v){return v}
+    // 判断then里面传入参数，不是函数，则进行参数透传， params => params
     onRejected = typeof onRejected === 'function' ? onRejected : function(r){throw r}
     var self = this
     var promise2
 
     if (self.status === 'resolved') {
+      // Promise/A+ 规范，必须实现thenable的函数，且函数执行必须返回新的Promise实例，进行链式调用
       return promise2 = new Promise(function(resolve, reject) {
-        setTimeout(function() {
+        setTimeout(function() {  // 推入异步宏任务队列
           try {
-            var x = onResolved(self.data)
+            var x = onResolved(self.data) // 执行 resolved状态对应的回调
             resolvePromise(promise2, x, resolve, reject)
           } catch(e) {
-            return reject(e)
+            return reject(e) // catch 里面是否需要执行当前promise 对应的 onRejected 回调? 需要， 上一个promise执行状态改变后，不会再次改变，错误执行的反馈只会在下一个Promise中体现。
           }
         })
       })
     }
 
-    if (self.status === 'rejected') {
+    if (self.status === 'rejected') {  // 同上， 执行reject拒绝回调。
       return promise2 = new Promise(function(resolve, reject) {
         setTimeout(function() {
           try {
@@ -110,7 +115,7 @@ var Promise = (function() {
       })
     }
 
-    if (self.status === 'pending') {
+    if (self.status === 'pending') {  // 当前状态为初始化的pending状态，则推入不同状态的回调队列中，后续状态发生变化时，再执行。
       return promise2 = new Promise(function(resolve, reject) {
         self.callbacks.push({
           onResolved: function(value) {
@@ -138,6 +143,7 @@ var Promise = (function() {
     return this.data
   }
 
+  // catch，在promise状态出现转化 pending -》 rejected 时，触发。
   Promise.prototype.catch = function(onRejected) {
     return this.then(null, onRejected)
   }
